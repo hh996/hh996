@@ -70,3 +70,23 @@ plt.ylabel('Y轴标签')  # 替换为你的Y轴标签
 plt.savefig('all_files_aggregated.png')  # 保存总图表
 plt.show()  # 显示总图表
 ```
+
+```python
+import re
+
+items = ["R", "W"]
+columns = [(0, 1), (0, 1)]
+workload = """2024-05-14-09:00:00.000	R:830,1249,111572,1	W:3039,17137,101672,2""".strip()
+datas = re.split(r"\s+", workload)
+
+current = {}
+all_data = {}
+for i_c_zip in zip(items, columns):
+    all_data[i_c_zip[0]] = {}
+    for column in i_c_zip[1]:
+        current[i_c_zip[0] + str(column)] = []
+        all_data[i_c_zip[0]][i_c_zip[0] + str(column)] = []
+
+print(current)
+print(all_data)
+```
