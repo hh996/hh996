@@ -282,5 +282,71 @@ def draw_all(datas, statistics, columns, suffix):
             plt.legend()
             plt.gcf().autofmt_xdate()
             plt.show()
+
+all_datas = {
+    "R0": {
+        "node5": [
+
+        ],
+        "node6": [
+
+        ],
+    },
+    "R1": {
+        "node5": [
+
+        ],
+        "node6": [
+
+        ],
+    },
+    "W0": {
+        "node5": [
+
+        ],
+        "node6": [
+
+        ],
+    },
+    "W1": {
+        "node5": [
+
+        ],
+        "node6": [
+
+        ],
+    },
+    "times": [
+       
+    ],
+}
+
+
+current_data = {
+    "times": [
+        
+    ],
+    "R0": [
+        
+    ],
+    "R1": [
+       
+    ],
+    "W0": [
+        
+    ],
+    "W1": [
+        
+    ],
+}
+
+
+statistics = ["R", "W"]
+
+columns = [[0, 1], [0, 1]]
+
+suffix = [["请求次数", "时延"], ["请求次数", "时延"]]
+
+colors = ["pink", "green"]
 ```
 
