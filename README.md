@@ -227,5 +227,60 @@ except subprocess.CalledProcessError as e:
     print(f"Standard error: {e.stderr}")
 
 
+def draw_single(datas, statistics, columns, suffix):
+    fig, ax1 = plt.subplots()
+    ax1.set_xlabel("时间")
+    times = [
+        datetime.strptime(time, "%Y-%m-%d-%H:%M:%S.%f")
+        for time in current_data["times"]
+    ]
+    color_index = 0
+    lines = []
+    labels = []
+    for item, column, suf in zip(statistics, columns, suffix):
+        # R [0, 1] ["请求次数", "时延"]
+        key = item + str(column[0])  # R0
+        ax1.set_ylabel(suf[0])  # 请求次数
+        (line1,) = ax1.plot(
+            times, datas[key], color=colors[color_index], linestyle="--"
+        )
+        lines.append(line1)
+        labels.append(item + suf[0])
+        if len(column) == 2:
+            ax2 = ax1.twinx()
+            key = item + str(column[1])  # R1
+            ax2.set_ylabel(suf[1])
+            (line2,) = ax2.plot(
+                times, datas[key], color=colors[color_index], linestyle="-"
+            )
+            lines.append(line2)
+            labels.append(item + suf[0])
+        color_index += 1
+    fig.legend(handles=lines, labels=labels)
+    plt.rcParams["font.sans-serif"] = ["SimHei"]
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%m:%d:%H:%M:%S"))
+    plt.gcf().autofmt_xdate()
+    plt.show()
+
+def draw_all(datas, statistics, columns, suffix):
+    times = [
+        datetime.strptime(time, "%Y-%m-%d-%H:%M:%S.%f")
+        for time in datas["times"]
+    ]
+    # R [0, 1] ["请求次数", "时延"]
+    for item, column, suf in zip(statistics, columns, suffix):
+        # 0 请求次数
+        for c, s in zip(column, suf):
+            key = item + str(c)
+            plt.xlabel("时间")
+            plt.ylabel(s)
+            # node5 [xxx]
+            for node, data in datas.get(key).items():
+                plt.plot(times, data, label=node + item + s)
+            plt.rcParams["font.sans-serif"] = ["SimHei"]
+            # 显示图例
+            plt.legend()
+            plt.gcf().autofmt_xdate()
+            plt.show()
 ```
 
