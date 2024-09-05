@@ -211,12 +211,12 @@ try:
                 column_data = _data.split(",")  # [830, 1249, 111572, 1]
                 for column in columns[item_index]:
                     current_prefix = item + str(column)  # R0
-                    current_data[current_prefix].append(column_data[column])
+                    current_data[current_prefix].append(int(column_data[column]))
         all_data["times"] = current_data["times"]
         for i_c_zip in zip(statistics, columns):
             for column in i_c_zip[1]:
                 prefix = i_c_zip[0] + str(column)
-                all_data[prefix][node].append(current_data[prefix])
+                all_data[prefix][node] = current_data[prefix]
     print(all_data)
     end_time = time.time()
     time_str = time.strftime("%M:%S", time.gmtime(end_time - start_time))
