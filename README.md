@@ -155,133 +155,232 @@ datas = {
         "2024-06-17-01:20:01.265916",
     ],
 }
-import os.path
+import os
 import re
 import subprocess
 import time
+from datetime import datetime
 
-input_command = input("输入统计项: ").strip()  # CA_NAS R,W
-statistics = input_command.split(" ")[1].split(",")  # ['R', 'W']
-columns = []  # [(0, 1), (0, 1)]
-for item in statistics:
-    columns_index = input("输入{}数据列, 英文逗号分割: ".format(item)).split(",")
-    columns.append(list(map(int, columns_index)))
+from matplotlib import pyplot as plt
+import matplotlib.dates as mdates
 
-suffix = []
-for i_c_zip in zip(statistics, columns):
-    temp_suffix = []
-    for column in i_c_zip[1]:
-        temp_suffix.append(input("输入{}第{}列后缀: ".format(i_c_zip[0], column)))
-    suffix.append(temp_suffix)
 
-try:
-    res = subprocess.run("pwd", capture_output=True, text=True, check=True, shell=True)
-    nodes_path = res.stdout.strip()
-    res = subprocess.run("ls", capture_output=True, text=True, check=True, shell=True)
-    nodes = res.stdout.strip().splitlines()
+class StatisticsProcessor:
+    def __init__(self):
+        self.input_command = ""
+        self.statistics = []
+        self.columns = []
+        self.suffix = []
 
-    # {'R0': {'node1': [], 'node2': []}, 'R1': {'node1': [], 'node2': []}}
-    all_data = {}
-    start_time = time.time()
-    for node in nodes:
-        print("开始处理{}".format(node))
-        current_data = {"times": []}  # {'R0': [], 'R1': [], 'W0': [], 'W1': []}
-        for i_c_zip in zip(statistics, columns):
-            for column in i_c_zip[1]:
-                current_data[i_c_zip[0] + str(column)] = []
-                all_prefix = i_c_zip[0] + str(column)
-                if not all_data.get(all_prefix):
-                    all_data[all_prefix] = {}
-                all_data[all_prefix][node] = []
+    def get_input_command(self) -> None:
+        self.input_command = input("输入统计项：").strip()  # CA_NAS R,W
+        self.statistics = re.split(r"\s+", self.input_command)[1].split(
+            ","
+        )  # ['R', 'W']
 
-        workload_path = os.path.join(nodes_path, node, "Messages/WorkLoad/WorkLoad/workload*")
-        exec_command = "cat {} | Workload {}".format(workload_path, input_command)
-        res = subprocess.run(exec_command, capture_output=True, text=True, check=True, shell=True)
-        # 2024-05-14-09:00:00.000	R:830,1249,111572,1	W:3039,17137,101672,2
-        workloads = res.stdout.strip().splitlines()
+    def get_columns(self) -> None:
+        for item in self.statistics:
+            columns_index = input(f"输入{item}数据列, 英文逗号分割: ").split(",")
+            self.columns.append(list(map(int, columns_index)))
+
+    def get_suffix(self) -> None:
+        for stat, cols in zip(self.statistics, self.columns):
+            temp_suffix = []
+            for column in cols:
+                temp_suffix.append(input(f"输入{stat}第{column}列后缀: "))
+            self.suffix.append(temp_suffix)
+
+    def process(self) -> None:
+        self.get_input_command()
+        self.get_columns()
+        self.get_suffix()
+
+    def display(self):
+        print("统计项:", self.statistics)
+        print("数据列:", self.columns)
+        print("后缀:", self.suffix)
+
+
+class NodeDataProcessor:
+    def __init__(self, statistics_processor: StatisticsProcessor):
+        self.stats_processor = statistics_processor
+        self.node_path = ""
+        self.nodes = []
+        """
+        self.all_data = {
+            "R0": {
+                "node5": [],
+                "node6": [],
+            },
+            "R1": {
+                "node5": [],
+                "node6": [],
+            },
+            "W0": {
+                "node5": [],
+                "node6": [],
+            },
+            "W1": {
+                "node5": [],
+                "node6": [],
+            },
+            "times": [],
+        }
+        """
+        self.all_data = {}
+
+    def fetch_nodes(self) -> None:
+        # 获取当前工作目录
+        res = subprocess.run("pwd", text=True, check=True, shell=True)
+        self.node_path = res.stdout.strip()
+
+        # 获取节点列表
+        res = subprocess.run("ls", text=True, check=True, shell=True)
+        self.nodes = res.stdout.strip().splitlines()
+
+    def run_workload_command(self, node) -> list[str]:
+        # 构建 workload 命令并执行
+        workload_path = os.path.join(
+            self.node_path, node, "Messages/WorkLoad/WorkLoad/workload*"
+        )
+        exec_command = (
+            f"cat {workload_path} | Workload {self.stats_processor.input_command}"
+        )
+        res = subprocess.run(exec_command, text=True, check=True, shell=True)
+        return res.stdout.strip().splitlines()
+
+    def process_node(self, node) -> None:
+
+        print(f"开始处理 {node}")
+        current_data = {"times": []}
+
+        """ 
+        初始化当前节点的数据结构
+        current_data = {
+            "times": [],
+            "R0": [],
+            "R1": [],
+            "W0": [],
+            "W1": [],
+        }
+        """
+        for stat, cols in zip(
+            self.stats_processor.statistics, self.stats_processor.columns
+        ):
+            for col in cols:
+                current_data[stat + str(col)] = []
+                all_prefix = stat + str(col)
+                if not self.all_data.get(all_prefix):
+                    self.all_data[all_prefix] = {}
+                self.all_data[all_prefix][node] = []
+
+        workloads = self.run_workload_command(node)
+
+        # 处理每行的 workload
         for workload in workloads:
-            # ['2024-05-14-09:00:00.000', 'R:830,1249,111572,1', 'W:3039,17137,101672,2']
             datas = re.split(r"\s+", workload)
             current_data["times"].append(datas[0])
             for data in datas[1:]:
-                split_data = data.split(":")  # [R, 830,1249,111572,1]
-                item = split_data[0]
+                split_data = data.split(":")
+                stat = split_data[0]
                 _data = split_data[1]
-                item_index = statistics.index(item)
-                column_data = _data.split(",")  # [830, 1249, 111572, 1]
-                for column in columns[item_index]:
-                    current_prefix = item + str(column)  # R0
-                    current_data[current_prefix].append(int(column_data[column]))
-        all_data["times"] = current_data["times"]
-        for i_c_zip in zip(statistics, columns):
-            for column in i_c_zip[1]:
-                prefix = i_c_zip[0] + str(column)
-                all_data[prefix][node] = current_data[prefix]
-    print(all_data)
-    end_time = time.time()
-    time_str = time.strftime("%M:%S", time.gmtime(end_time - start_time))
-    print("共耗时{}".format(time_str))
-except subprocess.CalledProcessError as e:
-    print(f"Command failed with return code {e.returncode}")
-    print(f"Standard output: {e.stdout}")
-    print(f"Standard error: {e.stderr}")
+                stat_index = self.stats_processor.statistics.index(stat)
+                column_data = _data.split(",")
+                for col in self.stats_processor.columns[stat_index]:
+                    current_prefix = stat + str(col)
+                    current_data[current_prefix].append(int(column_data[col]))
+
+        # 将当前节点的数据保存到全局数据结构
+        if not self.all_data.get("times"):
+            self.all_data["times"] = current_data["times"]
+        for stat, cols in zip(self.stats_processor.statistics, self.stats_processor.columns):
+            for col in cols:
+                prefix = stat + str(col)
+                self.all_data[prefix][node] = current_data[prefix]
+        print(f"{node} 数据处理完成.")
+
+    def process(self) -> None:
+        start_time = time.time()
+        self.fetch_nodes()
+
+        for node in self.nodes:
+            self.process_node(node)
+
+        end_time = time.time()
+        self.display_time_taken(start_time, end_time)
+
+    @staticmethod
+    def display_time_taken(start_time, end_time) -> None:
+        time_str = time.strftime("%M:%S", time.gmtime(end_time - start_time))
+        print(f"共耗时 {time_str}")
 
 
-def draw_single(datas, statistics, columns, suffix):
-    fig, ax1 = plt.subplots()
-    ax1.set_xlabel("时间")
-    times = [
-        datetime.strptime(time, "%Y-%m-%d-%H:%M:%S.%f")
-        for time in current_data["times"]
-    ]
-    color_index = 0
-    lines = []
-    labels = []
-    for item, column, suf in zip(statistics, columns, suffix):
-        # R [0, 1] ["请求次数", "时延"]
-        key = item + str(column[0])  # R0
-        ax1.set_ylabel(suf[0])  # 请求次数
-        (line1,) = ax1.plot(
-            times, datas[key], color=colors[color_index], linestyle="--"
-        )
-        lines.append(line1)
-        labels.append(item + suf[0])
-        if len(column) == 2:
-            ax2 = ax1.twinx()
-            key = item + str(column[1])  # R1
-            ax2.set_ylabel(suf[1])
-            (line2,) = ax2.plot(
-                times, datas[key], color=colors[color_index], linestyle="-"
+class Plotter:
+    def __init__(self, statistics_processor: StatisticsProcessor):
+        self.statistics_processor = statistics_processor
+        self.colors = ["b", "g", "r", "c", "m", "y", "k"]
+
+    def draw_single_node(self, data) -> None:
+        fig, ax1 = plt.subplots()
+        ax1.set_xlabel("时间")
+        times = [
+            datetime.strptime(t, "%Y-%m-%d-%H:%M:%S.%f")
+            for t in data["times"]
+        ]
+        color_index = 0
+        lines = []
+        labels = []
+
+        for stat, col, suf in zip(self.statistics_processor.statistics, self.statistics_processor.columns, self.statistics_processor.suffix):
+            key = stat + str(col[0])  # R0
+            ax1.set_ylabel(suf[0])  # 请求次数
+            (line1,) = ax1.plot(
+                times, data[key], color=self.colors[color_index], linestyle="--"
             )
-            lines.append(line2)
-            labels.append(item + suf[0])
-        color_index += 1
-    fig.legend(handles=lines, labels=labels)
-    plt.rcParams["font.sans-serif"] = ["SimHei"]
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%m:%d:%H:%M:%S"))
-    plt.gcf().autofmt_xdate()
-    plt.show()
+            lines.append(line1)
+            labels.append(stat + suf[0])
 
-def draw_all(datas, statistics, columns, suffix):
-    times = [
-        datetime.strptime(time, "%Y-%m-%d-%H:%M:%S.%f")
-        for time in datas["times"]
-    ]
-    # R [0, 1] ["请求次数", "时延"]
-    for item, column, suf in zip(statistics, columns, suffix):
-        # 0 请求次数
-        for c, s in zip(column, suf):
-            key = item + str(c)
-            plt.xlabel("时间")
-            plt.ylabel(s)
-            # node5 [xxx]
-            for node, data in datas.get(key).items():
-                plt.plot(times, data, label=node + item + s)
-            plt.rcParams["font.sans-serif"] = ["SimHei"]
-            # 显示图例
-            plt.legend()
-            plt.gcf().autofmt_xdate()
-            plt.show()
+            if len(col) == 2:
+                ax2 = ax1.twinx()
+                key = stat + str(col[1])  # R1
+                ax2.set_ylabel(suf[1])  # 时延
+                (line2,) = ax2.plot(
+                    times, data[key], color=self.colors[color_index], linestyle="-"
+                )
+                lines.append(line2)
+                labels.append(stat + suf[1])
+            color_index += 1
+        fig.legend(handles=lines, labels=labels)
+        plt.rcParams["font.sans-serif"] = ["SimHei"]  # 设置中文字体
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%m:%d:%H:%M:%S"))
+        plt.gcf().autofmt_xdate()
+        plt.show()
+
+    def draw_all(self, data) -> None:
+        times = [
+            datetime.strptime(t, "%Y-%m-%d-%H:%M:%S.%f")
+            for t in data["times"]
+        ]
+        for stat, col, suf in zip(self.statistics_processor.statistics, self.statistics_processor.columns, self.statistics_processor.suffix):
+            for c, s in zip(col, suf):
+                key = stat + str(c)  # R0
+                plt.xlabel("时间")
+                plt.ylabel(s)
+
+                for node, data in data.get(key).items():
+                    plt.plot(times, data, label=node + stat + s)
+
+                plt.rcParams["font.sans-serif"] = ["SimHei"]  # 设置中文字体
+                plt.legend()  # 显示图例
+                plt.gcf().autofmt_xdate()
+                plt.show()
+
+# 使用方法
+stats_processor = StatisticsProcessor()
+stats_processor.process()  # 用户输入统计项和列等信息
+
+processor = NodeDataProcessor(stats_processor)
+processor.process()
 
 all_datas = {
     "R0": {
