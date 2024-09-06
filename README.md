@@ -5,7 +5,13 @@
 - 📫 How to reach me ...
 - 😄 Pronouns: ...
 - ⚡ Fun fact: ...
+
+  
 每个节点的 读请求、时延；写请求、时延单独画一张图
+对齐刻度
+
+每个节点数据时间不一样
+
 <!---
 hh996/hh996 is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
 You can click the Preview link to take a look at your changes.
